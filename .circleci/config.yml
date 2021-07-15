@@ -1,17 +1,10 @@
 version: 2.1
 orbs:
   slack: circleci/slack@4.4.2
-  aws-s3: circleci/aws-s3@2.0.0
 jobs:
   build:
     docker:
       - image: circleci/node # ジョブのコマンドが実行されるプライマリ コンテナ
-
-    environment:
-      - AWS_S3_BUCKET_NAME: wppdx3learning
-      - AWS-ACCESS-KEY-ID: 
-      - AWS-REGION: 
-      - AWS-SECRET-ACCESS-KEY: 
     steps:
       - checkout # プロジェクト ディレクトリ内のコードをチェック アウトします
       - run : 
@@ -19,35 +12,9 @@ jobs:
           command: |
             npm install
             npm run build
-      # - run:
-      #     name: Deploy to S3 if branch is Master.
-      #     command: |
-      #       if [ "${CIRCLE_BRANCH}" == "develop" ]; then
-      #         aws s3 sync ~/dist s3://${AWS_S3_BUCKET_NAME}/ --exact-timestamps --delete
-      #       fi
-      - aws-s3/copy:
-          aws-access-key-id: ${AWS-ACCESS-KEY-ID}
-          aws-region: ${AWS-REGION}
-          aws-secret-access-key: ${AWS-SECRET-ACCESS-KEY}
-          from: '/dist/'
-          to: 's3:/${AWS_S3_BUCKET_NAME}'
       - slack/notify:
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "plain_text",
-                      "text": "*This is a text notification*",
-                      "emoji": true
-                    }
-                  ]
-                }
-              ]
-            }
-          event: always
+          event: pass
+          template: basic_fail_1
       - save_cache:
           paths:
             - node_modules
@@ -65,10 +32,31 @@ jobs:
           name: Test front-end
           command: |
             npm run test -- --no-watch --no-progress --browsers=ChromeHeadlessCI
+  deploy:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+            yum install -y nodejs
+      - run:
+          name: Front Build
+          command: |
+            npm install
+            npm run build
+      - run:
+          name: Deploy to S3
+          command: 
+            aws s3 cp ./dist s3://dx3-ci-angular --recursive
+
 workflows:
   my_workflow:
     jobs:
-      - build
-      - test:
-          requires:
-            - build
+      - deploy
+      # - build
+      # - test:
+      #     requires:
+      #       - build
