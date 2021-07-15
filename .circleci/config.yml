@@ -1,74 +1,44 @@
+# Use the latest 2.1 version of CircleCI pipeline process engine. 
+# See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
-orbs:
-  slack: circleci/slack@4.4.2
-  aws-s3: circleci/aws-s3@2.0.0
-jobs:
-  build:
-    docker:
-      - image: circleci/node # ジョブのコマンドが実行されるプライマリ コンテナ
 
-    environment:
-      - AWS_S3_BUCKET_NAME: wppdx3learning
-      - AWS-ACCESS-KEY-ID: 
-      - AWS-REGION: 
-      - AWS-SECRET-ACCESS-KEY: 
-    steps:
-      - checkout # プロジェクト ディレクトリ内のコードをチェック アウトします
-      - run : 
-          name: Build front-end
-          command: |
-            npm install
-            npm run build
-      # - run:
-      #     name: Deploy to S3 if branch is Master.
-      #     command: |
-      #       if [ "${CIRCLE_BRANCH}" == "develop" ]; then
-      #         aws s3 sync ~/dist s3://${AWS_S3_BUCKET_NAME}/ --exact-timestamps --delete
-      #       fi
-      - aws-s3/copy:
-          aws-access-key-id: ${AWS-ACCESS-KEY-ID}
-          aws-region: ${AWS-REGION}
-          aws-secret-access-key: ${AWS-SECRET-ACCESS-KEY}
-          from: '/dist/'
-          to: 's3:/${AWS_S3_BUCKET_NAME}'
-      - slack/notify:
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "plain_text",
-                      "text": "*This is a text notification*",
-                      "emoji": true
-                    }
-                  ]
-                }
-              ]
-            }
-          event: always
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies
-      - store_artifacts:
-          path: dist
-  test:
+orbs:
+  # The Node.js orb contains a set of prepackaged CircleCI configuration you can utilize
+  # Orbs reduce the amount of configuration required for common tasks. 
+  # See the orb documentation here: https://circleci.com/developer/orbs/orb/circleci/node
+  node: circleci/node@4.1
+
+
+jobs:
+  # Below is the definition of your job to build and test your app, you can rename and customize it as you want.
+  build-and-test:  
+    # These next lines define a Docker executor: https://circleci.com/docs/2.0/executor-types/
+    # You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
+    # A list of available CircleCI Docker Convenience Images are available here: https://circleci.com/developer/images/image/cimg/node
     docker:
-      - image: circleci/node:12-browsers 
+      - image: cimg/node:15.1
+    # Then run your tests!
+    # CircleCI will report the results back to your VCS provider.
     steps:
-      - checkout # プロジェクト ディレクトリ内のコードをチェック アウトします
-      - restore_cache:
-          key: v1-dependencies
-      - run : 
-          name: Test front-end
-          command: |
-            npm run test -- --no-watch --no-progress --browsers=ChromeHeadlessCI
+      # Checkout the code as the first step.
+      - checkout
+      # Next, the node orb's install-packages step will install the dependencies from a package.json.
+      # The orb install-packages step will also automatically cache them for faster future runs.
+      - node/install-packages
+      # If you are using yarn instead npm, remove the line above and uncomment the two lines below.
+      # - node/install-packages:
+      #     pkg-manager: yarn 
+      - run:
+          name: Run tests
+          command: npm test
+
 workflows:
-  my_workflow:
+  # Below is the definition of your workflow.
+  # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
+  # CircleCI will run this workflow on every commit.
+  # For more details on extending your workflow, see the configuration docs: https://circleci.com/docs/2.0/configuration-reference/#workflows
+  sample: 
     jobs:
-      - build
-      - test:
-          requires:
-            - build
+      - build-and-test
+      # For running simple node tests, you could optionally use the node/test job from the orb to replicate and replace the job above in fewer lines.
+      # - node/test
